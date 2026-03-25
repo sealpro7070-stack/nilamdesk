@@ -14,18 +14,8 @@ require('./scheduler/cron')
 const app = express()
 const PORT = process.env.PORT || 3001
 
-const allowedOrigins = [
-  process.env.FRONTEND_URL,
-  'http://localhost:5173',
-  'http://localhost:3000',
-].filter(Boolean)
-
 app.use(cors({
-  origin: (origin, cb) => {
-    // Allow requests with no origin (mobile apps, curl, Playwright)
-    if (!origin || allowedOrigins.includes(origin)) return cb(null, true)
-    cb(new Error(`CORS blocked: ${origin}`))
-  },
+  origin: true, // allow all origins — restrict via FRONTEND_URL once stable
   credentials: true
 }))
 app.use(express.json())
