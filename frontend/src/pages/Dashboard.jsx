@@ -51,16 +51,14 @@ export default function Dashboard() {
           setRecent(d.submissions || [])
         }
 
-        // Check AINS session status (mobile only)
-        if (isNative) {
-          const { data: ud } = await supabase
-            .from('users').select('cookie_updated_at').eq('id', user.id).single()
-          if (ud?.cookie_updated_at) {
-            const age = Date.now() - new Date(ud.cookie_updated_at).getTime()
-            setCookieStatus(age < 7 * 24 * 60 * 60 * 1000 ? 'fresh' : 'stale')
-          } else {
-            setCookieStatus('none')
-          }
+        // Check AINS session status for all users
+        const { data: ud } = await supabase
+          .from('users').select('cookie_updated_at').eq('id', user.id).single()
+        if (ud?.cookie_updated_at) {
+          const age = Date.now() - new Date(ud.cookie_updated_at).getTime()
+          setCookieStatus(age < 7 * 24 * 60 * 60 * 1000 ? 'fresh' : 'stale')
+        } else {
+          setCookieStatus('none')
         }
       } catch {
         // Supabase unreachable — still show the dashboard
@@ -73,8 +71,10 @@ export default function Dashboard() {
 
   async function handleSubmit() {
     if (!user) return
-    if (isNative && cookieStatus !== 'fresh') {
-      setTriggerMsg('Connect your AINS account in Settings first.')
+    if (cookieStatus !== 'fresh') {
+      setTriggerMsg(isNative
+        ? 'Connect your AINS account in Settings first.'
+        : 'Save your AINS session via the Chrome extension first.')
       setIsError(true)
       return
     }
@@ -126,7 +126,7 @@ export default function Dashboard() {
     <div className="space-y-5">
 
       {/* ── AINS session warning (mobile) ───────────── */}
-      {isNative && cookieStatus !== 'fresh' && (
+      {cookieStatus !== 'fresh' && cookieStatus !== null && (
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}

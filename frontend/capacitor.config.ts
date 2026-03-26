@@ -6,8 +6,6 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   server: {
     androidScheme: 'https',
-    url: 'https://nilam-auto.vercel.app',
-    cleartext: false,
   },
 };
 
