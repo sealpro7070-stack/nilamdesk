@@ -6,12 +6,14 @@ const ADMIN_EMAIL = 'm-10603978@moe-dl.edu.my'
 
 export default function Navbar() {
   const navigate = useNavigate()
-  const [isAdmin, setIsAdmin] = useState(false)
+  const [isAdmin, setIsAdmin]   = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [userEmail, setUserEmail] = useState('')
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setIsAdmin(session?.user?.email === ADMIN_EMAIL)
+      setUserEmail(session?.user?.email || '')
     })
   }, [])
 
@@ -20,53 +22,51 @@ export default function Navbar() {
     navigate('/')
   }
 
-  const navItems = [
-    { to: '/dashboard', label: 'Dashboard' },
-    { to: '/settings', label: 'Settings' },
-    { to: '/history', label: 'History' },
-  ]
-
   const linkClass = ({ isActive }) =>
-    `text-sm font-semibold px-3.5 py-2 rounded-xl transition-colors ${
+    `text-sm font-semibold px-3.5 py-2 rounded-lg transition-all duration-150 ${
       isActive
-        ? 'bg-primary-50 text-primary-700'
-        : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
+        ? 'text-z-green bg-z-green/8'
+        : 'text-z-fog hover:text-z-snow hover:bg-z-lift'
     }`
 
   return (
-    <header className="bg-white border-b border-gray-100 sticky top-0 z-50">
+    <header className="bg-z-card/90 backdrop-blur-md border-b border-z-rim sticky top-0 z-50">
       <div className="max-w-5xl mx-auto px-4 h-14 sm:h-16 flex items-center justify-between">
+
         {/* Logo */}
         <NavLink to="/dashboard" className="flex items-center gap-2.5 group">
-          <div className="w-9 h-9 bg-primary-600 rounded-xl flex items-center justify-center shadow-sm group-hover:bg-primary-700 transition-colors">
-            <BookIcon className="w-5 h-5 text-white" />
+          <div className="w-8 h-8 bg-z-green rounded-lg flex items-center justify-center group-hover:bg-z-green-d transition-colors shadow-glow-g-sm">
+            <BookIcon className="w-4 h-4 text-z-void" />
           </div>
-          <span className="font-bold text-gray-900 tracking-tight">Nilam Auto</span>
+          <span className="font-display font-bold text-z-snow tracking-tight">Nilam Auto</span>
         </NavLink>
 
         {/* Desktop nav */}
         <nav className="hidden sm:flex items-center gap-0.5">
-          {navItems.map(item => (
-            <NavLink key={item.to} to={item.to} className={linkClass}>
-              {item.label}
-            </NavLink>
-          ))}
+          <NavLink to="/dashboard" className={linkClass}>Dashboard</NavLink>
+          <NavLink to="/settings" className={linkClass}>Settings</NavLink>
+          <NavLink to="/history" className={linkClass}>History</NavLink>
           {isAdmin && (
             <NavLink
               to="/admin"
               className={({ isActive }) =>
-                `text-sm font-semibold px-3.5 py-2 rounded-xl transition-colors ${
-                  isActive ? 'bg-violet-50 text-violet-700' : 'text-violet-500 hover:bg-violet-50 hover:text-violet-700'
+                `text-sm font-semibold px-3.5 py-2 rounded-lg transition-all ${
+                  isActive ? 'text-z-blue bg-z-blue/10' : 'text-z-blue/70 hover:text-z-blue hover:bg-z-blue/8'
                 }`
               }
             >
               Admin
             </NavLink>
           )}
-          <div className="w-px h-5 bg-gray-200 mx-1.5" />
+          <div className="w-px h-4 bg-z-rim mx-2" />
+          {/* Connected badge */}
+          <div className="hidden md:flex items-center gap-1.5 bg-z-green/10 border border-z-green/25 px-3 py-1.5 rounded-full mr-2">
+            <span className="w-1.5 h-1.5 bg-z-green rounded-full animate-pulse" />
+            <span className="text-z-green text-xs font-bold font-mono">Connected</span>
+          </div>
           <button
             onClick={handleLogout}
-            className="flex items-center gap-1.5 text-sm font-semibold text-gray-400 hover:text-red-600 px-3.5 py-2 rounded-xl hover:bg-red-50 transition-colors"
+            className="flex items-center gap-1.5 text-sm font-semibold text-z-ash hover:text-z-red px-3.5 py-2 rounded-lg hover:bg-z-red/8 transition-all"
           >
             <LogoutIcon className="w-4 h-4" />
             Logout
@@ -76,26 +76,39 @@ export default function Navbar() {
         {/* Mobile: hamburger */}
         <button
           onClick={() => setMenuOpen(v => !v)}
-          className="sm:hidden p-2 rounded-xl hover:bg-gray-100 transition-colors"
-          aria-label="Toggle menu"
+          className="sm:hidden p-2 rounded-lg hover:bg-z-lift transition-colors"
         >
           {menuOpen
-            ? <XIcon className="w-5 h-5 text-gray-600" />
-            : <MenuIcon className="w-5 h-5 text-gray-600" />}
+            ? <XIcon className="w-5 h-5 text-z-fog" />
+            : <MenuIcon className="w-5 h-5 text-z-fog" />}
         </button>
       </div>
 
       {/* Mobile dropdown */}
       {menuOpen && (
-        <div className="sm:hidden border-t border-gray-100 bg-white px-3 py-2 space-y-0.5 shadow-lg">
-          {navItems.map(item => (
+        <div className="sm:hidden border-t border-z-rim bg-z-card px-3 py-2 space-y-0.5">
+          {/* Email */}
+          {userEmail && (
+            <div className="px-4 py-2 mb-1">
+              <p className="text-xs text-z-ash font-mono truncate">{userEmail}</p>
+              <div className="flex items-center gap-1.5 mt-1">
+                <span className="w-1.5 h-1.5 bg-z-green rounded-full animate-pulse" />
+                <span className="text-z-green text-xs font-bold">Connected</span>
+              </div>
+            </div>
+          )}
+          {[
+            { to: '/dashboard', label: 'Dashboard' },
+            { to: '/settings',  label: 'Settings' },
+            { to: '/history',   label: 'History' },
+          ].map(item => (
             <NavLink
               key={item.to}
               to={item.to}
               onClick={() => setMenuOpen(false)}
               className={({ isActive }) =>
-                `flex items-center text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors ${
-                  isActive ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50'
+                `flex items-center text-sm font-semibold px-4 py-3 rounded-xl transition-all ${
+                  isActive ? 'bg-z-green/10 text-z-green' : 'text-z-fog hover:bg-z-lift hover:text-z-snow'
                 }`
               }
             >
@@ -107,8 +120,8 @@ export default function Navbar() {
               to="/admin"
               onClick={() => setMenuOpen(false)}
               className={({ isActive }) =>
-                `flex items-center text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors ${
-                  isActive ? 'bg-violet-50 text-violet-700' : 'text-violet-600 hover:bg-violet-50'
+                `flex items-center text-sm font-semibold px-4 py-3 rounded-xl transition-all ${
+                  isActive ? 'bg-z-blue/10 text-z-blue' : 'text-z-blue/70 hover:bg-z-lift hover:text-z-blue'
                 }`
               }
             >
@@ -117,7 +130,7 @@ export default function Navbar() {
           )}
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-2 text-sm font-semibold text-red-500 px-4 py-2.5 rounded-xl hover:bg-red-50 transition-colors"
+            className="w-full flex items-center gap-2 text-sm font-semibold text-z-ash hover:text-z-red px-4 py-3 rounded-xl hover:bg-z-red/8 transition-all"
           >
             <LogoutIcon className="w-4 h-4" />
             Logout
@@ -137,23 +150,11 @@ function BookIcon({ className }) {
   )
 }
 function MenuIcon({ className }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-    </svg>
-  )
+  return <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" /></svg>
 }
 function XIcon({ className }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-    </svg>
-  )
+  return <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
 }
 function LogoutIcon({ className }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-    </svg>
-  )
+  return <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
 }
