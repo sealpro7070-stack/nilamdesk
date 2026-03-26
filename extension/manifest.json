@@ -2,21 +2,15 @@
   "manifest_version": 3,
   "name": "Nilam Auto",
   "version": "1.0.0",
-  "description": "Captures your AINS session cookie and sends it to Nilam Auto.",
-  "permissions": [
-    "cookies",
-    "storage",
-    "tabs",
-    "scripting"
-  ],
+  "description": "Save your AINS session to Nilam Auto for automatic monthly submissions.",
+  "permissions": ["activeTab", "scripting", "storage", "cookies"],
   "host_permissions": [
-    "*://ains.moe.gov.my/*",
-    "*://*.ains.moe.gov.my/*",
-    "*://ains-api.moe.gov.my/*",
-    "http://localhost:3001/*"
+    "https://ains.moe.gov.my/*",
+    "https://ains-api.moe.gov.my/*"
   ],
-  "background": {
-    "service_worker": "background.js"
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Nilam Auto"
   },
   "content_scripts": [
     {
@@ -24,18 +18,5 @@
       "js": ["content.js"],
       "run_at": "document_idle"
     }
-  ],
-  "action": {
-    "default_popup": "popup.html",
-    "default_icon": {
-      "16": "icons/icon16.png",
-      "48": "icons/icon48.png",
-      "128": "icons/icon128.png"
-    }
-  },
-  "icons": {
-    "16": "icons/icon16.png",
-    "48": "icons/icon48.png",
-    "128": "icons/icon128.png"
-  }
+  ]
 }

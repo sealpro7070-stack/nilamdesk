@@ -1,16 +1,12 @@
-// content.js — runs on ains.moe.gov.my
-// Reads auth_token from localStorage and relays it to the popup
+// Content script — runs on ains.moe.gov.my
+// Reads the 3 sessionStorage keys the bot needs to inject
 
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === 'GET_AUTH_TOKEN') {
-    const token = localStorage.getItem('auth_token')
-    const userData = localStorage.getItem('user') || localStorage.getItem('currentUser') || null
-
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'getSessionStorage') {
     sendResponse({
-      token,
-      userData,
-      url: window.location.href,
-      isLoggedIn: !!token
+      token:     sessionStorage.getItem('jb-app-token')   || null,
+      ssUser:    sessionStorage.getItem('jb-app-user')    || null,
+      ssProfile: sessionStorage.getItem('jb-app-profile') || null,
     })
   }
   return true

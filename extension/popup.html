@@ -7,161 +7,150 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       width: 320px;
-      background: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f8f7ff;
       color: #1a1a2e;
     }
+
     .header {
-      background: linear-gradient(135deg, #6C5CE7, #a29bfe);
-      padding: 18px 20px;
+      background: #6C5CE7;
+      padding: 14px 16px;
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
     }
-    .logo {
-      width: 36px; height: 36px;
+    .header-icon {
+      width: 28px; height: 28px;
       background: rgba(255,255,255,0.2);
       border-radius: 8px;
       display: flex; align-items: center; justify-content: center;
-      font-weight: 800; font-size: 18px; color: #fff;
     }
-    .header-text h1 { color: #fff; font-size: 16px; font-weight: 700; }
-    .header-text p  { color: rgba(255,255,255,0.75); font-size: 12px; margin-top: 2px; }
+    .header h1 { color: #fff; font-size: 15px; font-weight: 700; }
+    .header p  { color: rgba(255,255,255,0.75); font-size: 11px; margin-top: 1px; }
 
-    .body { padding: 14px 16px; }
+    .body { padding: 16px; }
 
-    .status-box {
-      display: flex; align-items: flex-start; gap: 10px;
-      padding: 10px 12px; border-radius: 8px;
-      font-size: 12px; margin-bottom: 14px; line-height: 1.4;
+    .status-bar {
+      display: flex; align-items: center; gap: 8px;
+      background: #fff;
+      border: 1px solid #e2e0f9;
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 14px;
+      font-size: 12px;
     }
-    .status-box.ok    { background: #f0fdf4; color: #166534; }
-    .status-box.warn  { background: #fefce8; color: #854d0e; }
-    .status-box.info  { background: #f0f4ff; color: #3730a3; }
-    .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 3px; }
-    .dot.green  { background: #22c55e; }
-    .dot.yellow { background: #eab308; }
-    .dot.purple { background: #6C5CE7; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .dot.green  { background: #00b894; }
+    .dot.orange { background: #fdcb6e; }
+    .dot.red    { background: #d63031; }
+    .status-text { color: #555; line-height: 1.4; }
 
-    .field-group { margin-bottom: 12px; }
-    label {
-      display: block; font-size: 12px; font-weight: 600;
-      color: #374151; margin-bottom: 3px;
-    }
-    .hint { font-size: 11px; color: #9ca3af; margin-bottom: 5px; }
+    label { display: block; font-size: 11px; font-weight: 600; color: #555; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
     input {
-      width: 100%; padding: 8px 10px;
-      border: 1.5px solid #e5e7eb; border-radius: 7px;
-      font-size: 13px; outline: none;
+      width: 100%; padding: 9px 11px;
+      border: 1.5px solid #ddd; border-radius: 8px;
+      font-size: 13px; background: #fff; color: #1a1a2e;
+      outline: none; transition: border-color 0.15s;
     }
     input:focus { border-color: #6C5CE7; }
+    .field { margin-bottom: 12px; }
 
-    .cookie-preview {
-      background: #f9fafb; border: 1px solid #e5e7eb;
-      border-radius: 6px; padding: 6px 10px;
-      font-size: 10px; color: #6b7280; margin-bottom: 12px;
-      word-break: break-all; max-height: 50px; overflow: hidden;
-      display: none;
+    .btn {
+      width: 100%; padding: 11px;
+      border: none; border-radius: 10px;
+      font-size: 14px; font-weight: 700; cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
     }
-    .cookie-preview.visible { display: block; }
-
-    button {
-      width: 100%; padding: 10px;
-      background: #6C5CE7; color: #fff;
-      font-size: 13px; font-weight: 600;
-      border: none; border-radius: 8px; cursor: pointer;
-      transition: background 0.15s;
+    .btn:active { transform: scale(0.98); }
+    .btn-primary { background: #6C5CE7; color: #fff; }
+    .btn-primary:hover { opacity: 0.9; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .btn-ghost {
+      background: transparent; color: #6C5CE7;
+      border: 1.5px solid #e2e0f9;
+      font-size: 12px; padding: 8px; margin-top: 8px;
     }
-    button:hover:not(:disabled) { background: #5a47d4; }
-    button:disabled { background: #a29bfe; cursor: not-allowed; }
 
     .msg {
-      margin-top: 10px; padding: 8px 12px;
-      border-radius: 7px; font-size: 12px; text-align: center;
+      margin-top: 12px; padding: 10px 12px;
+      border-radius: 8px; font-size: 12px; font-weight: 600; line-height: 1.5;
+      display: none;
     }
-    .msg.success { background: #f0fdf4; color: #166534; }
-    .msg.error   { background: #fef2f2; color: #991b1b; }
+    .msg.success { background: #d4edda; color: #155724; display: block; }
+    .msg.error   { background: #f8d7da; color: #721c24; display: block; }
 
-    .footer {
-      border-top: 1px solid #f3f4f6;
-      padding: 10px 16px;
-      font-size: 11px; color: #9ca3af; text-align: center;
+    .divider { border: none; border-top: 1px solid #e8e6f9; margin: 14px 0; }
+
+    .settings-toggle {
+      background: none; border: none; cursor: pointer;
+      font-size: 11px; color: #888; text-decoration: underline;
+      padding: 0; display: block; margin: 0 auto;
     }
-    .saved-time {
-      font-size: 11px; color: #9ca3af;
-      text-align: center; margin-top: 8px; display: none;
+
+    #settings-section { display: none; margin-top: 12px; }
+    #settings-section.open { display: block; }
+
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
     }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
-
-<div class="header">
-  <div class="logo">N</div>
-  <div class="header-text">
-    <h1>Nilam Auto</h1>
-    <p>AINS Session Capture</p>
-  </div>
-</div>
-
-<div class="body">
-
-  <div id="status-box" class="status-box info">
-    <div class="dot purple"></div>
-    <span id="status-text">Checking AINS login status...</span>
-  </div>
-
-  <div class="field-group">
-    <label for="userIdentifier">Your Nilam Auto Email</label>
-    <div class="hint">Use the email you registered with on Nilam Auto</div>
-    <input
-      type="email"
-      id="userIdentifier"
-      placeholder="e.g. teacher@school.edu.my"
-      autocomplete="off"
-      spellcheck="false"
-    />
-  </div>
-
-  <div style="display:flex; gap:6px;">
-    <button id="saveBtn" disabled style="flex:1;">Save Session</button>
-    <button id="saveAndSubmitBtn" disabled style="flex:1; background:#1a1a2e;">Save & Submit</button>
-  </div>
-  <div style="font-size:10px; color:#9ca3af; text-align:center; margin-top:4px;">
-    Use "Save & Submit" to submit immediately while session is fresh
-  </div>
-
-  <div id="msg" class="msg" style="display:none"></div>
-  <div id="savedTime" class="saved-time"></div>
-
-  <!-- Last submission status -->
-  <div id="submissionCard" style="display:none; margin-top:14px; border:1px solid #e5e7eb; border-radius:8px; overflow:hidden;">
-    <div style="background:#f9fafb; padding:8px 12px; font-size:11px; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em;">
-      Last Submission
+  <div class="header">
+    <div class="header-icon">
+      <svg width="16" height="16" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+      </svg>
     </div>
-    <div style="padding:10px 12px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-        <span id="subBook" style="font-size:12px; font-weight:600; color:#1a1a2e; flex:1; margin-right:8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">—</span>
-        <span id="subBadge" style="font-size:10px; font-weight:700; padding:2px 8px; border-radius:99px; flex-shrink:0;"></span>
-      </div>
-      <div id="subDate" style="font-size:11px; color:#9ca3af;"></div>
+    <div>
+      <h1>Nilam Auto</h1>
+      <p>AINS Session Saver</p>
     </div>
   </div>
 
-  <!-- Standalone Submit -->
-  <div style="margin-top:12px;">
-    <button id="triggerBtn" disabled style="background:#374151;">
-      Submit Records Now
+  <div class="body">
+    <!-- Status -->
+    <div class="status-bar">
+      <div class="dot" id="status-dot"></div>
+      <span class="status-text" id="status-text">Checking page…</span>
+    </div>
+
+    <!-- Email -->
+    <div class="field">
+      <label>Your Nilam Auto Email</label>
+      <input type="email" id="email" placeholder="student@gmail.com" />
+    </div>
+
+    <!-- Save session button -->
+    <button class="btn btn-primary" id="save-btn" disabled>
+      <svg width="16" height="16" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
+      </svg>
+      Save Session
     </button>
-    <div id="triggerMsg" class="msg" style="display:none; margin-top:8px;"></div>
+
+    <div class="msg" id="msg"></div>
+
+    <hr class="divider" />
+
+    <button class="settings-toggle" id="settings-toggle">⚙ Backend URL settings</button>
+
+    <div id="settings-section">
+      <div class="field" style="margin-top:10px;">
+        <label>Backend URL</label>
+        <input type="url" id="backend-url" placeholder="https://your-app.up.railway.app" />
+      </div>
+      <button class="btn btn-ghost" id="save-settings-btn">Save Settings</button>
+    </div>
   </div>
 
-</div>
-
-<div class="footer">
-  Must be logged in to <strong>ains.moe.gov.my</strong> before saving.
-</div>
-
-<script src="popup.js"></script>
+  <script src="popup.js"></script>
 </body>
 </html>
