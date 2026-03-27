@@ -186,10 +186,12 @@ async function performLogin(userId, email, password, onStatus) {
 
     // Wait for MFA approval — URL leaves the auth provider pages
     await page.waitForURL(
-      (url) =>
-        !url.includes('login.microsoftonline.com') &&
-        !url.includes('login.microsoft.com') &&
-        !url.includes('accounts.google.com'),
+      (url) => {
+        const href = url.href || url.toString()
+        return !href.includes('login.microsoftonline.com') &&
+               !href.includes('login.microsoft.com') &&
+               !href.includes('accounts.google.com')
+      },
       { timeout: MFA_TIMEOUT_MS }
     )
     console.log(`[login] MFA approved, now on: ${page.url()}`)
