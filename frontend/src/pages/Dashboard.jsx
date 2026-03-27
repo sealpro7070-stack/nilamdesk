@@ -52,10 +52,10 @@ export default function Dashboard() {
           setRecent(d.submissions || [])
         }
 
-        // Check if AINS credentials are saved
+        // Check if AINS session is saved
         const { data: ud } = await supabase
-          .from('users').select('ains_creds_updated_at').eq('id', user.id).single()
-        setCredsStatus(ud?.ains_creds_updated_at ? 'saved' : 'none')
+          .from('users').select('ains_cookie_encrypted').eq('id', user.id).single()
+        setCredsStatus(ud?.ains_cookie_encrypted ? 'saved' : 'none')
       } catch {
         // Supabase unreachable — still show the dashboard
       } finally {
@@ -102,12 +102,12 @@ export default function Dashboard() {
   }
 
   const handleAINSConnected = async () => {
-    // After user connects, refresh creds status and auto-trigger submission
+    // After user connects, refresh session status and auto-trigger submission
     const { data: ud } = await supabase
-      .from('users').select('ains_creds_updated_at').eq('id', user.id).single()
-    setCredsStatus(ud?.ains_creds_updated_at ? 'saved' : 'none')
+      .from('users').select('ains_cookie_encrypted').eq('id', user.id).single()
+    setCredsStatus(ud?.ains_cookie_encrypted ? 'saved' : 'none')
     // Auto-trigger
-    if (ud?.ains_creds_updated_at) {
+    if (ud?.ains_cookie_encrypted) {
       await doTrigger(user.id, LANG_MAP[lang] || lang, bookCount)
     }
   }

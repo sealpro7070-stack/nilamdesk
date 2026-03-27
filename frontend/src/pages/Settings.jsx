@@ -77,8 +77,8 @@ export default function Settings() {
       }
 
       const { data: ud } = await supabase
-        .from('users').select('ains_creds_updated_at').eq('id', user.id).single()
-      setCredsStatus(ud?.ains_creds_updated_at ? 'saved' : 'none')
+        .from('users').select('ains_cookie_encrypted').eq('id', user.id).single()
+      setCredsStatus(ud?.ains_cookie_encrypted ? 'saved' : 'none')
 
       setLoading(false)
     }
@@ -100,10 +100,10 @@ export default function Settings() {
   }
 
   const handleAINSConnected = async () => {
-    // Refresh credentials status after connection
+    // Refresh session status after connection
     const { data: ud } = await supabase
-      .from('users').select('ains_creds_updated_at').eq('id', user.id).single()
-    setCredsStatus(ud?.ains_creds_updated_at ? 'saved' : 'none')
+      .from('users').select('ains_cookie_encrypted').eq('id', user.id).single()
+    setCredsStatus(ud?.ains_cookie_encrypted ? 'saved' : 'none')
   }
 
   if (loading) return (
