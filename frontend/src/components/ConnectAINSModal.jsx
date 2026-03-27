@@ -10,14 +10,10 @@ export default function ConnectAINSModal({ userId, isOpen, onClose, onSuccess })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [mobileInput, setMobileInput] = useState('')
-  const [isMobile, setIsMobile] = useState(false)
+  const [isMobile] = useState(() => window.innerWidth < 768 || 'ontouchstart' in window)
   const canvasRef = useRef(null)
   const pollIntervalRef = useRef(null)
   const mobileInputRef = useRef(null)
-
-  useEffect(() => {
-    setIsMobile(window.innerWidth < 768 || 'ontouchstart' in window)
-  }, [])
 
   // Draw screenshot onto canvas whenever it updates
   useEffect(() => {
