@@ -167,8 +167,6 @@ async function startBot(userId, directCookie, directSsUser, directSsProfile, dir
 async function startBotForSlot(userId, slotId, slot) {
   console.log(`\n[bot] Starting for family slot ${slotId}`)
 
-  const { decrypt } = require('../lib/crypto')
-
   let ssToken = null, ssUser = null, ssProfile = null, cookiesToInject = []
   try {
     const raw = decrypt(slot.ains_cookie_encrypted)
@@ -219,7 +217,7 @@ async function startBotForSlot(userId, slotId, slot) {
   // Fetch parent user for runBot
   const { data: user } = await supabase.from('users').select('*').eq('id', userId).single()
 
-  const result = await require('./browser').runBot({
+  const result = await runBot({
     user,
     settings: { language: slot.language, books_per_month: slot.books_per_month },
     cookie: ssToken,

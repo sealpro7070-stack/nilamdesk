@@ -15,11 +15,8 @@ export default function ConnectAINSModal({ isOpen, onClose, onSuccess, targetUse
   const activeRef = useRef(false)
 
   const stopPolling = () => {
-    if (pollRef.current) {
-      if (pollRef.current._visCleanup) pollRef.current._visCleanup()
-      clearInterval(pollRef.current)
-      pollRef.current = null
-    }
+    if (pollRef._visCleanup) { pollRef._visCleanup(); pollRef._visCleanup = null }
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
   }
 
   const getToken = async () => {

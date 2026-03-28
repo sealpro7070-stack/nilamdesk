@@ -54,7 +54,7 @@ router.get('/my-request', requireAuth, async (req, res) => {
     .eq('user_id', req.authUser.id)
     .order('created_at', { ascending: false })
     .limit(1)
-    .single()
+    .maybeSingle()
 
   res.json({ request: data || null })
 })

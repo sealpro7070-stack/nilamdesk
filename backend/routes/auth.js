@@ -60,7 +60,7 @@ router.post('/connect', requireAuth, async (req, res) => {
               .select('id')
               .eq('ains_user_id_hash', hash)
               .neq('id', userId)
-              .single()
+              .maybeSingle()
 
             if (conflict) {
               loginState[userId] = { status: 'error', message: 'This AINS account is already connected to another Nilam Auto account.' }
@@ -180,7 +180,7 @@ router.post('/register', async (req, res) => {
 
     const { data, error } = await supabase
       .from('users')
-      .upsert(row, { onConflict: 'id' })
+      .upsert({ id, email, delima_id, is_active: true }, { onConflict: 'id' })
       .select()
       .single()
 

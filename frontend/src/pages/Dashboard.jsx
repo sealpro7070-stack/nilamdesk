@@ -489,7 +489,7 @@ export default function Dashboard() {
                   </div>
 
                   {/* Connect form */}
-                  {!slot.ains_connected && ss.phase !== 'connecting' && ss.phase !== 'done' && (
+                  {(!slot.ains_connected || ss.showForm) && ss.phase !== 'connecting' && ss.phase !== 'done' && (
                     <>
                       {ss.showForm ? (
                         <div className="space-y-2 pt-1">
