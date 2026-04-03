@@ -6,10 +6,11 @@ import BookCard from '../components/BookCard'
 import ConnectAINSModal from '../components/ConnectAINSModal'
 import UpgradeModal from '../components/UpgradeModal'
 
-const BACKEND   = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
-const LANGUAGES = ['Malay', 'English', 'Chinese', 'Tamil']
-const LANG_MAP  = { Malay: 'Melayu', English: 'Inggeris', Chinese: 'Cina', Tamil: 'Tamil' }
+const BACKEND      = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
+const LANGUAGES    = ['Malay', 'English', 'Chinese', 'Tamil']
+const LANG_MAP     = { Malay: 'Melayu', English: 'Inggeris', Chinese: 'Cina', Tamil: 'Tamil' }
 const LANG_DISPLAY = { Melayu: 'Malay', Inggeris: 'English', Cina: 'Chinese', Tamil: 'Tamil' }
+const ADMIN_EMAILS = (import.meta.env.VITE_ADMIN_EMAIL || '').split(',').map(e => e.trim()).filter(Boolean)
 
 export default function Dashboard() {
   const navigate = useNavigate()
@@ -77,7 +78,8 @@ export default function Dashboard() {
           .from('users').select('ains_cookie_encrypted, plan').eq('id', user.id).maybeSingle()
         const connected = !!ud?.ains_cookie_encrypted
         setCredsStatus(connected ? 'saved' : 'none')
-        const userPlan = ud?.plan || 'free'
+        const isAdminUser = ADMIN_EMAILS.includes(user.email || '')
+        const userPlan = isAdminUser ? 'noob' : (ud?.plan || 'free')
         setPlan(userPlan)
         // Clamp bookCount to the plan's actual limit (settings may have a higher value than the plan allows)
         const planMax = userPlan === 'free' ? 1 : userPlan === 'noob' ? 999 : 50
@@ -314,7 +316,7 @@ export default function Dashboard() {
                 {credsStatus === 'saved' ? 'AINS Connected' : 'AINS Not Set'}
               </span>
             </button>
-            {plan === 'free' && (
+            {plan === 'free' && !ADMIN_EMAILS.includes(user?.email || '') && (
               <button
                 onClick={() => setShowUpgradeModal(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white text-brand-600 text-xs font-extrabold hover:bg-brand-50 transition-colors shadow-sm"
