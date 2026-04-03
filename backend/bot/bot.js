@@ -8,6 +8,7 @@ require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') }
 const supabase = require('../lib/supabase')
 const { decrypt } = require('../lib/crypto')
 const { runBot } = require('./browser')
+const { isAdminEmail } = require('../lib/auth-middleware')
 
 // Plan limits — single source of truth
 // noob = tester role granted by admin, effectively unlimited
@@ -73,7 +74,7 @@ async function _startBot(userId, directCookie, directSsUser, directSsProfile, di
   console.log(`[bot] User: ${user.email}`)
 
   // Derive plan limits from the user row (bot is the final authority — not the route layer)
-  const isAdminUser = user.email === process.env.ADMIN_EMAIL
+  const isAdminUser = isAdminEmail(user.email)
   const planExpired = user.plan_expires_at && new Date(user.plan_expires_at) < new Date()
   // noob plan never expires (admin-granted tester role)
   const activePlan  = (user.plan === 'noob') ? 'noob' : (planExpired ? 'free' : (user.plan || 'free'))

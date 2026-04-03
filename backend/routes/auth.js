@@ -3,7 +3,7 @@ const router = express.Router()
 const crypto = require('crypto')
 const supabase = require('../lib/supabase')
 const { encrypt, decrypt } = require('../lib/crypto')
-const { requireAuth } = require('../lib/auth-middleware')
+const { requireAuth, isAdminEmail } = require('../lib/auth-middleware')
 const sm = require('../lib/session-manager')
 
 // In-memory login state per user
@@ -19,7 +19,7 @@ router.post('/connect', requireAuth, async (req, res) => {
   // Admin can pass targetUserId to connect AINS on behalf of another user
   let userId = req.authUser.id
   if (targetUserId && targetUserId !== userId) {
-    if (req.authUser.email !== process.env.ADMIN_EMAIL) {
+    if (!isAdminEmail(req.authUser.email)) {
       return res.status(403).json({ error: 'Only admins can connect AINS for other users' })
     }
     userId = targetUserId
@@ -182,7 +182,7 @@ router.post('/register', requireAuth, async (req, res) => {
   }
 
   try {
-    const isAdmin = email === process.env.ADMIN_EMAIL
+    const isAdmin = isAdminEmail(email)
 
     const { data, error } = await supabase
       .from('users')

@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import ConnectAINSModal from '../components/ConnectAINSModal'
 
-const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || 'nigellim7070@gmail.com'
+const ADMIN_EMAILS = (import.meta.env.VITE_ADMIN_EMAIL || 'nigellim7070@gmail.com').split(',').map(e => e.trim()).filter(Boolean)
+const isAdminEmail = (email) => !!email && ADMIN_EMAILS.includes(email)
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
 
 export default function Admin() {
@@ -33,7 +34,7 @@ export default function Admin() {
   async function checkAdminAndLoad() {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) { navigate('/'); return }
-    if (session.user.email !== ADMIN_EMAIL) { navigate('/dashboard'); return }
+    if (!isAdminEmail(session.user.email)) { navigate('/dashboard'); return }
     setToken(session.access_token)
     await Promise.all([fetchUsers(session.access_token), fetchPayments(session.access_token)])
   }
@@ -321,7 +322,7 @@ export default function Admin() {
                         </td>
                         <td className="px-5 py-4 text-center">
                           <div className="flex flex-col items-center gap-1">
-                            {user.email === ADMIN_EMAIL ? (
+                            {isAdminEmail(user.email) ? (
                               <span className="text-xs text-brand-500 font-bold">👑 Admin</span>
                             ) : (
                               <>

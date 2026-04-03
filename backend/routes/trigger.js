@@ -2,7 +2,7 @@ const express = require('express')
 const router = express.Router()
 const supabase = require('../lib/supabase')
 const { startBot } = require('../bot/bot')
-const { requireAuth, checkRateLimit } = require('../lib/auth-middleware')
+const { requireAuth, checkRateLimit, isAdminEmail } = require('../lib/auth-middleware')
 
 // POST /api/trigger
 // Body: { userId } OR { userIdentifier: email }
@@ -14,8 +14,7 @@ router.post('/', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'userId is required' })
   }
 
-  const isAdmin = req.authUser?.email === process.env.ADMIN_EMAIL
-  const ADMIN_EMAIL = process.env.ADMIN_EMAIL
+  const isAdmin = isAdminEmail(req.authUser?.email)
 
   // Only admin can trigger for other users
   if (userId !== req.authUser.id && !isAdmin) {

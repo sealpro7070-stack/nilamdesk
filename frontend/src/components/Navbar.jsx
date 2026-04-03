@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
 // Use env var to avoid exposing PII in the public JS bundle
-const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL
+const ADMIN_EMAILS = (import.meta.env.VITE_ADMIN_EMAIL || '').split(',').map(e => e.trim()).filter(Boolean)
 
 export default function Navbar() {
   const navigate = useNavigate()
@@ -13,7 +13,7 @@ export default function Navbar() {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsAdmin(session?.user?.email === ADMIN_EMAIL)
+      setIsAdmin(ADMIN_EMAILS.includes(session?.user?.email || ''))
       setUserEmail(session?.user?.email || '')
     })
     return () => subscription.unsubscribe()

@@ -1,5 +1,12 @@
 const supabase = require('./supabase')
 
+// Support comma-separated ADMIN_EMAIL for multiple admins
+// e.g. ADMIN_EMAIL=nigellim7070@gmail.com,m-10603978@moe-dl.edu.my
+const ADMIN_EMAILS = (process.env.ADMIN_EMAIL || '').split(',').map(e => e.trim()).filter(Boolean)
+function isAdminEmail(email) {
+  return !!email && ADMIN_EMAILS.includes(email)
+}
+
 // In-memory rate limit: max 5 trigger runs per user per hour
 const rateLimitMap = new Map()
 
@@ -42,4 +49,4 @@ async function requireAuth(req, res, next) {
   }
 }
 
-module.exports = { requireAuth, checkRateLimit }
+module.exports = { requireAuth, checkRateLimit, isAdminEmail, ADMIN_EMAILS }

@@ -1,8 +1,7 @@
 const express = require('express')
 const router = express.Router()
 const supabase = require('../lib/supabase')
-
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL
+const { isAdminEmail, ADMIN_EMAILS } = require('../lib/auth-middleware')
 
 // ── Admin auth middleware ─────────────────────────────────────────
 // Decodes the JWT payload directly (no extra client needed),
@@ -17,7 +16,7 @@ async function requireAdmin(req, res, next) {
     // Verify the JWT signature via Supabase — same pattern as requireAuth
     const { data: { user }, error } = await supabase.auth.getUser(token)
     if (error || !user) return res.status(401).json({ error: 'Invalid token' })
-    if (user.email !== ADMIN_EMAIL) return res.status(403).json({ error: 'Access denied' })
+    if (!isAdminEmail(user.email)) return res.status(403).json({ error: 'Access denied' })
 
     req.adminUser = user
     next()
@@ -40,14 +39,16 @@ router.get('/users', requireAdmin, async (req, res) => {
       id: u.id,
       email: u.email,
       // Admin is always active
-      is_active: u.email === ADMIN_EMAIL ? true : false,
+      is_active: isAdminEmail(u.email) ? true : false,
       created_at: u.created_at
     }))
     const { error: upsertErr } = await supabase.from('users').upsert(rows, { onConflict: 'id', ignoreDuplicates: true })
     if (upsertErr) console.error('[admin] upsert error:', upsertErr.message)
 
     // Ensure admin is always active even if row already existed
-    await supabase.from('users').update({ is_active: true }).eq('email', ADMIN_EMAIL)
+    if (ADMIN_EMAILS.length > 0) {
+      await supabase.from('users').update({ is_active: true }).in('email', ADMIN_EMAILS)
+    }
   }
 
   // 3. Fetch public.users for activation + cookie status + plan/role

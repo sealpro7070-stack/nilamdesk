@@ -19,8 +19,9 @@ const PLAN_PRICES = { plus: 18, family: 48 }
 const PLAN_LABELS = { plus: 'Plus', family: 'Family' }
 
 // ─── Admin guard ──────────────────────────────────────────────────────────────
+const { isAdminEmail } = require('../lib/auth-middleware')
 function requireAdmin(req, res, next) {
-  if (req.authUser?.email !== process.env.ADMIN_EMAIL) {
+  if (!isAdminEmail(req.authUser?.email)) {
     return res.status(403).json({ error: 'Admin only' })
   }
   next()
