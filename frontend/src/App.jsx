@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate, NavLink } from 'react-router-dom'
+import { Routes, Route, Navigate, NavLink, Link } from 'react-router-dom'
 import Landing  from './pages/Landing'
 import Dashboard from './pages/Dashboard'
 import Settings  from './pages/Settings'
@@ -32,6 +32,13 @@ function AppLayout({ children }) {
     <div className="min-h-screen bg-page">
       <Navbar />
       <main className="max-w-5xl mx-auto px-4 py-5 pb-28 sm:pb-8">{children}</main>
+      <footer className="hidden sm:block border-t border-line py-4">
+        <div className="max-w-5xl mx-auto px-4 flex items-center justify-center gap-4">
+          <Link to="/terms" className="text-xs text-subtle hover:text-muted transition-colors">Terms of Use</Link>
+          <span className="text-subtle text-xs">·</span>
+          <Link to="/privacy" className="text-xs text-subtle hover:text-muted transition-colors">Privacy Policy</Link>
+        </div>
+      </footer>
       <BottomNav />
     </div>
   )
