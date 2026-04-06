@@ -586,6 +586,13 @@ export default function Landing() {
                   <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Processing…</>
                 ) : mode === 'login' ? 'Sign In' : 'Create Account'}
               </button>
+
+              <p className="text-center text-xs text-subtle leading-relaxed">
+                By {mode === 'login' ? 'signing in' : 'creating an account'}, you agree to our{' '}
+                <Link to="/terms" target="_blank" className="underline hover:text-muted transition-colors">Terms of Use</Link>
+                {' '}and acknowledge our{' '}
+                <Link to="/privacy" target="_blank" className="underline hover:text-muted transition-colors">Privacy Policy</Link>.
+              </p>
             </form>
 
             <div className="mt-4 pt-4 border-t border-line text-center">
