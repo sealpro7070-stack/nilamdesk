@@ -40,6 +40,9 @@ router.post('/connect', requireAuth, async (req, res) => {
   // Run login flow asynchronously — client polls /connect-status
   ;(async () => {
     try {
+      // Clear any stale session so every reconnect starts completely fresh
+      await supabase.from('users').update({ ains_cookie_encrypted: null }).eq('id', userId).catch(() => {})
+
       const { ssToken, ssUser, ssProfile, cookies } = await sm.performLogin(
         userId,
         email,

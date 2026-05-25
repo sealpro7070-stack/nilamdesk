@@ -195,21 +195,10 @@ async function performLogin(userId, email, password, onStatus) {
       await page.locator('input[type="submit"], #idSIButton9').first().click()
     }
 
-    console.log(`[login] Credentials submitted (${isGoogle ? 'Google' : 'Microsoft'}), checking for MFA challenge`)
+    console.log(`[login] Credentials submitted (${isGoogle ? 'Google' : 'Microsoft'}), waiting for MFA/redirect`)
 
-    // Wait up to 8s for the auth provider MFA page to render, but stop early if the
-    // URL already moved on (no MFA needed, or instant approval).
-    const authProviderPattern = /accounts\.google\.com|login\.microsoftonline\.com|login\.microsoft\.com/
-    await Promise.race([
-      page.waitForURL(url => !authProviderPattern.test(url.href), { timeout: 8000 }),
-      new Promise(r => setTimeout(r, 8000)),
-    ]).catch(() => {})
-
-    // Detect number-matching challenge — both Google and Microsoft can show a
-    // 2-digit number on screen that the user must tap on their phone to confirm.
-    let mfaNumber = null
-    const urlAfterCreds = page.url()
-    const onAuthProvider = authProviderPattern.test(urlAfterCreds)
+    // Wait 3s for the MFA challenge page to render, then detect number-matching
+    await page.waitForTimeout(3000)
 
     const extractNumber = () => page.evaluate(() => {
       const candidates = []
@@ -227,31 +216,25 @@ async function performLogin(userId, email, password, onStatus) {
       return candidates[0].txt
     }).catch(() => null)
 
-    if (onAuthProvider) {
+    let mfaNumber = await extractNumber()
+    // Retry once after 2s if number-matching challenge hasn't rendered yet
+    if (!mfaNumber) {
+      await page.waitForTimeout(2000)
       mfaNumber = await extractNumber()
-
-      // Retry once after 2s — number-matching challenges sometimes take a moment to render
-      if (!mfaNumber) {
-        await new Promise(r => setTimeout(r, 2000))
-        mfaNumber = await extractNumber()
-      }
-
-      console.log(`[login] MFA challenge: ${mfaNumber ? `number-matching (${mfaNumber})` : 'simple push approval'}`)
     }
 
+    console.log(`[login] MFA challenge: ${mfaNumber ? `number-matching (${mfaNumber})` : 'simple push approval'}`)
     if (onStatus) onStatus('waiting_mfa', { mfaNumber })
 
-    // Wait for MFA approval — URL leaves the auth provider pages
+    // Wait for final redirect to ains.moe.gov.my — this is the definitive signal that
+    // authentication (including MFA) is complete. Using the AINS URL directly avoids the
+    // race where intermediate OAuth redirects briefly leave the auth provider domain,
+    // causing the old "leave auth provider" check to resolve prematurely.
     await page.waitForURL(
-      (url) => {
-        const href = url.href || url.toString()
-        return !href.includes('login.microsoftonline.com') &&
-               !href.includes('login.microsoft.com') &&
-               !href.includes('accounts.google.com')
-      },
+      url => url.href.startsWith('https://ains.moe.gov.my'),
       { timeout: MFA_TIMEOUT_MS }
     )
-    console.log(`[login] MFA approved, now on: ${page.url()}`)
+    console.log(`[login] Authenticated, landed on AINS: ${page.url()}`)
 
     // MFA approved — update status so the frontend stops showing "Check your phone"
     // and shows a "capturing session" spinner instead.
