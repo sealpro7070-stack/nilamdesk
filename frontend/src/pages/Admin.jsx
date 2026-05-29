@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase'
 import ConnectAINSModal from '../components/ConnectAINSModal'
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
+const ADMIN_EMAILS = (import.meta.env.VITE_ADMIN_EMAIL || '').split(',').map(e => e.trim()).filter(Boolean)
+const isAdminEmail = (email) => !!email && ADMIN_EMAILS.includes(email)
 
 export default function Admin() {
   const navigate = useNavigate()
