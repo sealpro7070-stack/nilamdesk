@@ -58,7 +58,9 @@ router.post('/connect', requireAuth, async (req, res) => {
       )
 
       // One AINS per account: check uniqueness via sha256 of ssUser identifier
-      if (ssUser) {
+      // Admins bypass this check so they can test with any account
+      const isConnectingAdmin = isAdminEmail(req.authUser.email)
+      if (ssUser && !isConnectingAdmin) {
         try {
           const parsed = JSON.parse(ssUser)
           const ainsId = parsed?.id || parsed?.userId || parsed?.username || parsed?.ic || null
