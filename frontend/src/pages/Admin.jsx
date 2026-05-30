@@ -33,6 +33,11 @@ export default function Admin() {
   const [qrSaving, setQrSaving]   = useState(false)
   // Receipt lightbox
   const [receiptOpen, setReceiptOpen] = useState(null) // receipt data URL to display
+  // Grant-credits modal
+  const [grantTarget, setGrantTarget] = useState(null) // { id, email, credits } of user
+  const [grantAmount, setGrantAmount] = useState('')
+  const [grantNote, setGrantNote]     = useState('')
+  const [grantSaving, setGrantSaving] = useState(false)
 
   useEffect(() => { checkAdminAndLoad() }, [])
   useEffect(() => { if (tab === 'settings') fetchQrSettings() }, [tab])
@@ -108,6 +113,26 @@ export default function Admin() {
       showToast(`Role set to "${role}" for user`)
     } catch (err) { showToast(err.message, 'error') }
     finally { setRoleTarget(null) }
+  }
+
+  async function grantCredits(e) {
+    e.preventDefault()
+    const amt = parseInt(grantAmount, 10)
+    if (!Number.isInteger(amt) || amt === 0) { showToast('Enter a non-zero whole number', 'error'); return }
+    setGrantSaving(true)
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/admin/grant-credits`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ userId: grantTarget.id, amount: amt, note: grantNote })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setUsers(prev => prev.map(u => u.id === grantTarget.id ? { ...u, credits: data.user?.credits ?? u.credits } : u))
+      showToast(`${amt > 0 ? 'Granted' : 'Deducted'} ${Math.abs(amt)} credits — new balance ${data.user?.credits}`)
+      setGrantTarget(null); setGrantAmount(''); setGrantNote('')
+    } catch (err) { showToast(err.message, 'error') }
+    finally { setGrantSaving(false) }
   }
 
   async function reviewPayment(requestId, action) {
@@ -372,6 +397,7 @@ export default function Admin() {
                     <tr className="bg-gray-50 border-b border-line text-left">
                       <th className="px-5 py-3 text-xs font-bold text-muted uppercase tracking-wide">User</th>
                       <th className="px-5 py-3 text-xs font-bold text-muted uppercase tracking-wide hidden md:table-cell">Plan</th>
+                      <th className="px-5 py-3 text-xs font-bold text-muted uppercase tracking-wide text-center">Credits</th>
                       <th className="px-5 py-3 text-xs font-bold text-muted uppercase tracking-wide hidden md:table-cell">Cookie</th>
                       <th className="px-5 py-3 text-xs font-bold text-muted uppercase tracking-wide hidden md:table-cell">Records</th>
                       <th className="px-5 py-3 text-xs font-bold text-muted uppercase tracking-wide">Joined</th>
@@ -401,6 +427,15 @@ export default function Admin() {
                             user.plan === 'tester' ? 'bg-yellow-100 text-yellow-700' :
                                                      'bg-gray-100 text-gray-600'
                           }`}>{user.plan || 'free'}{user.plan === 'noob' ? ' 🧪' : user.plan === 'tester' ? ' 🔬' : ''}</span>
+                        </td>
+                        <td className="px-5 py-4 text-center">
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="font-bold text-heading text-sm tabular-nums">{user.credits ?? 0}</span>
+                            <button
+                              onClick={() => { setGrantTarget({ id: user.id, email: user.email, credits: user.credits ?? 0 }); setGrantAmount(''); setGrantNote('') }}
+                              className="text-xs font-semibold text-brand-600 hover:underline"
+                            >Grant</button>
+                          </div>
                         </td>
                         <td className="px-5 py-4 hidden md:table-cell">
                           {user.has_cookie
@@ -766,6 +801,57 @@ export default function Admin() {
           </div>
         )}
       </div>
+
+      {/* Grant Credits modal */}
+      {grantTarget && (
+        <div
+          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+          onClick={() => !grantSaving && setGrantTarget(null)}
+        >
+          <form
+            onSubmit={grantCredits}
+            onClick={e => e.stopPropagation()}
+            className="bg-white rounded-card shadow-card-md w-full max-w-sm p-6 space-y-4"
+          >
+            <div>
+              <h2 className="font-display text-base font-bold text-heading">Grant Credits</h2>
+              <p className="text-xs text-muted mt-0.5 truncate">{grantTarget.email}</p>
+              <p className="text-xs text-muted mt-1">Current balance: <strong className="text-heading">{grantTarget.credits}</strong> credits</p>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-muted uppercase tracking-wide">Amount</label>
+              <input
+                type="number" step="1" autoFocus
+                placeholder="e.g. 150 (use −10 to deduct)"
+                value={grantAmount}
+                onChange={e => setGrantAmount(e.target.value)}
+                className="input w-full mt-1"
+              />
+              <p className="text-[11px] text-subtle mt-1">Positive adds, negative deducts (balance can't go below 0).</p>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-muted uppercase tracking-wide">Note (optional)</label>
+              <input
+                type="text" maxLength={500}
+                placeholder="Reason for this grant"
+                value={grantNote}
+                onChange={e => setGrantNote(e.target.value)}
+                className="input w-full mt-1"
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="submit" disabled={grantSaving}
+                className="flex-1 py-2.5 bg-brand-600 text-white rounded-xl font-bold text-sm hover:bg-brand-700 disabled:opacity-50 transition-colors"
+              >{grantSaving ? 'Saving…' : 'Apply'}</button>
+              <button
+                type="button" onClick={() => setGrantTarget(null)} disabled={grantSaving}
+                className="px-4 py-2.5 border border-line rounded-xl text-muted text-sm font-bold hover:bg-gray-50 disabled:opacity-50"
+              >Cancel</button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* Receipt Lightbox */}
       {receiptOpen && (

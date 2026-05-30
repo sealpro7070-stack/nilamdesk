@@ -54,7 +54,7 @@ router.get('/users', requireAdmin, async (req, res) => {
   // 3. Fetch public.users for activation + cookie status + plan/role
   const { data: publicUsers } = await supabase
     .from('users')
-    .select('id, is_active, delima_id, cookie_updated_at, plan, plan_expires_at, ains_cookie_encrypted')
+    .select('id, is_active, delima_id, cookie_updated_at, plan, plan_expires_at, ains_cookie_encrypted, credits')
 
   const publicMap = {}
   for (const u of (publicUsers || [])) publicMap[u.id] = u
@@ -100,6 +100,7 @@ router.get('/users', requireAdmin, async (req, res) => {
         plan:                effectivePlan,
         plan_raw:            pub.plan || 'free',
         plan_expires_at:     pub.plan_expires_at || null,
+        credits:             pub.credits ?? 0,
         created_at:          u.created_at,
         last_sign_in:        u.last_sign_in_at,
         submissions_total:   countMap[u.id]?.total   || 0,
@@ -166,6 +167,77 @@ router.post('/activate', requireAdmin, async (req, res) => {
   }
 
   res.json({ success: true, user: data })
+})
+
+// POST /api/admin/grant-credits — manually add/deduct credits for a user.
+// Every grant is logged to admin_credit_grants (who/how-many/note/when) so the
+// action is auditable. Uses add_credits RPC which floors the balance at 0.
+router.post('/grant-credits', requireAdmin, async (req, res) => {
+  const { userId, amount, note } = req.body
+
+  if (!userId || !isValidUUID(userId)) {
+    return res.status(400).json({ error: 'userId must be a valid UUID' })
+  }
+  const amt = Number(amount)
+  if (!Number.isInteger(amt) || amt === 0 || Math.abs(amt) > 100000) {
+    return res.status(400).json({ error: 'amount must be a non-zero integer (max ±100000)' })
+  }
+  if (note != null && (typeof note !== 'string' || note.length > 500)) {
+    return res.status(400).json({ error: 'note must be a string up to 500 chars' })
+  }
+
+  // Apply the credit change (floors at 0, accepts negatives to deduct)
+  const { error: rpcErr } = await supabase.rpc('add_credits', {
+    target_user_id: userId,
+    amount: amt,
+  })
+  if (rpcErr) {
+    console.error('[admin] grant-credits add_credits error:', rpcErr.message)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+
+  // Audit log (best-effort — credit change already applied)
+  const { error: logErr } = await supabase.from('admin_credit_grants').insert({
+    user_id: userId,
+    amount: amt,
+    note: note?.trim() || null,
+    granted_by: req.adminUser.email,
+  })
+  if (logErr) console.error('[admin] grant-credits audit log error:', logErr.message)
+
+  // Return the new balance
+  const { data: userRow } = await supabase
+    .from('users')
+    .select('id, email, credits')
+    .eq('id', userId)
+    .single()
+
+  res.json({ success: true, user: userRow })
+})
+
+// GET /api/admin/credit-grants?userId= — audit history of manual grants.
+// Without userId, returns the 100 most recent grants across all users.
+router.get('/credit-grants', requireAdmin, async (req, res) => {
+  const { userId } = req.query
+
+  let query = supabase
+    .from('admin_credit_grants')
+    .select('id, user_id, amount, note, granted_by, created_at')
+    .order('created_at', { ascending: false })
+    .limit(100)
+
+  if (userId) {
+    if (!isValidUUID(userId)) return res.status(400).json({ error: 'userId must be a valid UUID' })
+    query = query.eq('user_id', userId)
+  }
+
+  const { data, error } = await query
+  if (error) {
+    console.error('[admin] credit-grants list error:', error.message)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+
+  res.json({ grants: data || [] })
 })
 
 module.exports = router
