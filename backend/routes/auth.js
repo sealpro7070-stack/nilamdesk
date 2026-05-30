@@ -261,6 +261,18 @@ router.post('/register', requireAuth, async (req, res) => {
 
     if (insertErr) return res.status(500).json({ error: 'Registration failed. Please try again.' })
 
+    // The auth.users -> public.users trigger may have already created the row,
+    // which makes the ignoreDuplicates upsert above a no-op. Attach the referral
+    // code here as a separate, idempotent step: set it ONLY when still null, so
+    // it lands on first sign-up and is never overwritten on later logins.
+    if (refCode) {
+      await supabase
+        .from('users')
+        .update({ referred_by: refCode })
+        .eq('id', id)
+        .is('referred_by', null)
+    }
+
     // Return the current row (existing or just-created), untouched.
     const { data, error } = await supabase
       .from('users')
