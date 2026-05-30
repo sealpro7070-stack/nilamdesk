@@ -99,7 +99,7 @@ router.get('/users', requireAdmin, async (req, res) => {
   res.json({ users })
 })
 
-const VALID_ROLES = ['free', 'plus', 'family', 'noob']
+const VALID_ROLES = ['free', 'tester', 'plus', 'family', 'noob']
 
 function isValidUUID(str) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str)

@@ -96,7 +96,7 @@ export default function Admin() {
       setUsers(prev => prev.map(u => u.id === userId ? {
         ...u,
         plan: role,
-        is_active: (role === 'plus' || role === 'family' || role === 'noob') ? true : u.is_active,
+        is_active: (role === 'plus' || role === 'family' || role === 'tester' || role === 'noob') ? true : u.is_active,
       } : u))
       showToast(`Role set to "${role}" for user`)
     } catch (err) { showToast(err.message, 'error') }
@@ -304,8 +304,9 @@ export default function Admin() {
                             user.plan === 'family' ? 'bg-ok-100 text-ok-700' :
                             user.plan === 'plus'   ? 'bg-brand-100 text-brand-700' :
                             user.plan === 'noob'   ? 'bg-purple-100 text-purple-700' :
+                            user.plan === 'tester' ? 'bg-yellow-100 text-yellow-700' :
                                                      'bg-gray-100 text-gray-600'
-                          }`}>{user.plan || 'free'}{user.plan === 'noob' ? ' 🧪' : ''}</span>
+                          }`}>{user.plan || 'free'}{user.plan === 'noob' ? ' 🧪' : user.plan === 'tester' ? ' 🔬' : ''}</span>
                         </td>
                         <td className="px-5 py-4 hidden md:table-cell">
                           {user.has_cookie
@@ -345,6 +346,7 @@ export default function Admin() {
                                   <option value="free">Free</option>
                                   <option value="plus">Plus</option>
                                   <option value="family">Family</option>
+                                  <option value="tester">Tester 🔬</option>
                                   <option value="noob">Noob 🧪</option>
                                 </select>
                                 <button
