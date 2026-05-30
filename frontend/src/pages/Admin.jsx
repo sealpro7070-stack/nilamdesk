@@ -2,6 +2,10 @@ import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import ConnectAINSModal from '../components/ConnectAINSModal'
+import {
+  ResponsiveContainer, BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
+  XAxis, YAxis, Tooltip, CartesianGrid,
+} from 'recharts'
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
 const ADMIN_EMAILS = (import.meta.env.VITE_ADMIN_EMAIL || '').split(',').map(e => e.trim()).filter(Boolean)
@@ -9,7 +13,7 @@ const isAdminEmail = (email) => !!email && ADMIN_EMAILS.includes(email)
 
 export default function Admin() {
   const navigate = useNavigate()
-  const [tab, setTab]           = useState('users')   // 'users' | 'payments' | 'referrals' | 'settings'
+  const [tab, setTab]           = useState('overview') // 'overview' | 'users' | 'payments' | 'referrals' | 'settings'
   const [users, setUsers]       = useState([])
   const [payments, setPayments] = useState([])
   // Referrals state
@@ -38,10 +42,14 @@ export default function Admin() {
   const [grantAmount, setGrantAmount] = useState('')
   const [grantNote, setGrantNote]     = useState('')
   const [grantSaving, setGrantSaving] = useState(false)
+  const [grantHistory, setGrantHistory] = useState([])
+  const [grantHistoryLoading, setGrantHistoryLoading] = useState(false)
 
   useEffect(() => { checkAdminAndLoad() }, [])
   useEffect(() => { if (tab === 'settings') fetchQrSettings() }, [tab])
   useEffect(() => { if (tab === 'referrals') { fetchCodes(); fetchCommissions() } }, [tab, commFilter])
+  useEffect(() => { if (tab === 'overview') fetchCodes() }, [tab])
+  useEffect(() => { if (grantTarget) fetchGrantHistory(grantTarget.id); else setGrantHistory([]) }, [grantTarget])
 
   async function checkAdminAndLoad() {
     const { data: { session } } = await supabase.auth.getSession()
@@ -115,6 +123,19 @@ export default function Admin() {
     finally { setRoleTarget(null) }
   }
 
+  async function fetchGrantHistory(userId) {
+    setGrantHistoryLoading(true)
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/admin/credit-grants?userId=${userId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setGrantHistory(data.grants || [])
+    } catch { setGrantHistory([]) }
+    finally { setGrantHistoryLoading(false) }
+  }
+
   async function grantCredits(e) {
     e.preventDefault()
     const amt = parseInt(grantAmount, 10)
@@ -130,7 +151,10 @@ export default function Admin() {
       if (!res.ok) throw new Error(data.error)
       setUsers(prev => prev.map(u => u.id === grantTarget.id ? { ...u, credits: data.user?.credits ?? u.credits } : u))
       showToast(`${amt > 0 ? 'Granted' : 'Deducted'} ${Math.abs(amt)} credits — new balance ${data.user?.credits}`)
-      setGrantTarget(null); setGrantAmount(''); setGrantNote('')
+      // Keep the modal open and refresh balance + history so the admin sees the log
+      setGrantTarget(t => t ? { ...t, credits: data.user?.credits ?? t.credits } : t)
+      setGrantAmount(''); setGrantNote('')
+      fetchGrantHistory(grantTarget.id)
     } catch (err) { showToast(err.message, 'error') }
     finally { setGrantSaving(false) }
   }
@@ -301,6 +325,69 @@ export default function Admin() {
     withCookie: users.filter(u => u.has_cookie).length,
   }
 
+  // ── Analytics (computed client-side from already-loaded data) ──
+  const analytics = useMemo(() => {
+    // Last 6 calendar months as { key: 'YYYY-MM', label: 'Mon' }
+    const months = []
+    const now = new Date()
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      months.push({
+        key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+        label: d.toLocaleString('en-MY', { month: 'short' }),
+      })
+    }
+    const monthKey = (iso) => {
+      const d = new Date(iso)
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    }
+
+    // Signups per month
+    const signupByMonth = Object.fromEntries(months.map(m => [m.key, 0]))
+    for (const u of users) {
+      if (!u.created_at) continue
+      const k = monthKey(u.created_at)
+      if (k in signupByMonth) signupByMonth[k]++
+    }
+
+    // Revenue per month (approved payments only; amount is in sen)
+    const approved = payments.filter(p => p.status === 'approved')
+    const revenueByMonth = Object.fromEntries(months.map(m => [m.key, 0]))
+    let totalRevenue = 0
+    for (const p of approved) {
+      const rm = (p.amount || 0) / 100
+      totalRevenue += rm
+      const k = monthKey(p.created_at)
+      if (k in revenueByMonth) revenueByMonth[k] += rm
+    }
+
+    const trend = months.map(m => ({
+      label: m.label,
+      signups: signupByMonth[m.key],
+      revenue: Math.round(revenueByMonth[m.key] * 100) / 100,
+    }))
+
+    // Plan mix
+    const planCounts = {}
+    for (const u of users) {
+      const p = u.plan || 'free'
+      planCounts[p] = (planCounts[p] || 0) + 1
+    }
+    const planMix = Object.entries(planCounts).map(([name, value]) => ({ name, value }))
+
+    // Top referrers (from codes' stats)
+    const topReferrers = [...(codes || [])]
+      .map(c => ({ code: c.code, name: c.owner_name, signups: c.stats?.signups ?? 0, orders: c.stats?.orders ?? 0 }))
+      .sort((a, b) => b.orders - a.orders || b.signups - a.signups)
+      .slice(0, 5)
+
+    return { trend, planMix, topReferrers, totalRevenue, approvedCount: approved.length }
+  }, [users, payments, codes])
+
+  const PLAN_COLORS = {
+    free: '#94A3B8', plus: '#6366F1', family: '#10B981', tester: '#EAB308', noob: '#A855F7',
+  }
+
   return (
     <div className="min-h-screen bg-page">
       {/* Header */}
@@ -337,6 +424,7 @@ export default function Admin() {
         {/* Tabs */}
         <div className="flex gap-2 mb-5 border-b border-line">
           {[
+            { id: 'overview', label: 'Overview' },
             { id: 'users',    label: 'Users' },
             { id: 'payments', label: `Payments${pendingPayCount > 0 ? ` (${pendingPayCount})` : ''}` },
             { id: 'referrals', label: 'Referrals' },
@@ -355,6 +443,99 @@ export default function Admin() {
             </button>
           ))}
         </div>
+
+        {/* ── Overview tab ── */}
+        {tab === 'overview' && (
+          <div className="space-y-6">
+            {/* Revenue KPIs */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[
+                { label: 'Total Revenue', value: `RM${analytics.totalRevenue.toFixed(2)}`, cls: 'bg-ok-50 text-ok-700 border-ok-100' },
+                { label: 'Paid Orders', value: analytics.approvedCount, cls: 'bg-brand-50 text-brand-700 border-brand-100' },
+                { label: 'Active Users', value: stats.active, cls: 'bg-indigo-50 text-indigo-700 border-indigo-100' },
+                { label: 'AINS Connected', value: stats.withCookie, cls: 'bg-amber-50 text-amber-700 border-amber-100' },
+              ].map(s => (
+                <div key={s.label} className={`rounded-card p-4 border ${s.cls}`}>
+                  <div className="font-display text-2xl font-extrabold">{s.value}</div>
+                  <div className="text-sm mt-1 font-semibold opacity-80">{s.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Trends */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="card-p">
+                <h3 className="font-display text-sm font-bold text-heading mb-3">Signups (last 6 months)</h3>
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={analytics.trend}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                    <XAxis dataKey="label" tick={{ fontSize: 12 }} stroke="#94A3B8" />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 12 }} stroke="#94A3B8" width={28} />
+                    <Tooltip />
+                    <Bar dataKey="signups" fill="#6366F1" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="card-p">
+                <h3 className="font-display text-sm font-bold text-heading mb-3">Revenue RM (last 6 months)</h3>
+                <ResponsiveContainer width="100%" height={220}>
+                  <LineChart data={analytics.trend}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                    <XAxis dataKey="label" tick={{ fontSize: 12 }} stroke="#94A3B8" />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 12 }} stroke="#94A3B8" width={36} />
+                    <Tooltip formatter={v => `RM${Number(v).toFixed(2)}`} />
+                    <Line type="monotone" dataKey="revenue" stroke="#10B981" strokeWidth={2.5} dot={{ r: 3 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Plan mix + Top referrers */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="card-p">
+                <h3 className="font-display text-sm font-bold text-heading mb-3">Plan mix</h3>
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie data={analytics.planMix} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={e => `${e.name} (${e.value})`}>
+                      {analytics.planMix.map(p => (
+                        <Cell key={p.name} fill={PLAN_COLORS[p.name] || '#CBD5E1'} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="card-p">
+                <h3 className="font-display text-sm font-bold text-heading mb-3">Top referrers</h3>
+                {analytics.topReferrers.length === 0 ? (
+                  <p className="text-sm text-muted py-8 text-center">No referral codes yet.</p>
+                ) : (
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs font-bold text-muted uppercase tracking-wide border-b border-line">
+                        <th className="py-2">Code</th>
+                        <th className="py-2 text-center">Signups</th>
+                        <th className="py-2 text-center">Orders</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {analytics.topReferrers.map(r => (
+                        <tr key={r.code} className="border-b border-line/50">
+                          <td className="py-2.5">
+                            <div className="font-mono font-bold text-heading">{r.code}</div>
+                            <div className="text-xs text-muted">{r.name}</div>
+                          </td>
+                          <td className="py-2.5 text-center text-muted">{r.signups}</td>
+                          <td className="py-2.5 text-center font-bold text-heading">{r.orders}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── Users tab ── */}
         {tab === 'users' && (
@@ -848,6 +1029,31 @@ export default function Admin() {
                 type="button" onClick={() => setGrantTarget(null)} disabled={grantSaving}
                 className="px-4 py-2.5 border border-line rounded-xl text-muted text-sm font-bold hover:bg-gray-50 disabled:opacity-50"
               >Cancel</button>
+            </div>
+
+            {/* Grant history */}
+            <div className="border-t border-line pt-3">
+              <p className="text-xs font-bold text-muted uppercase tracking-wide mb-2">Recent grants</p>
+              {grantHistoryLoading ? (
+                <p className="text-xs text-subtle">Loading…</p>
+              ) : grantHistory.length === 0 ? (
+                <p className="text-xs text-subtle">No manual grants yet.</p>
+              ) : (
+                <ul className="space-y-1.5 max-h-40 overflow-y-auto">
+                  {grantHistory.map(g => (
+                    <li key={g.id} className="flex items-start justify-between gap-2 text-xs">
+                      <div className="min-w-0">
+                        <span className="text-muted">{new Date(g.created_at).toLocaleDateString('en-MY')}</span>
+                        {g.note && <span className="text-subtle truncate"> · {g.note}</span>}
+                        <div className="text-subtle truncate">by {g.granted_by}</div>
+                      </div>
+                      <span className={`font-bold tabular-nums flex-shrink-0 ${g.amount > 0 ? 'text-ok-600' : 'text-danger-600'}`}>
+                        {g.amount > 0 ? '+' : ''}{g.amount}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </form>
         </div>
