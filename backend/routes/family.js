@@ -306,7 +306,18 @@ router.post('/slots/:slotId/trigger', requireAuth, requireActive, requireFamily,
     if (result?.success === false && result?.reason === 'session_expired') {
       respond({ success: false, error: 'AINS session expired. Please reconnect this slot.' })
     } else if (result?.skipped) {
-      respond({ success: true, message: "Already submitted this month's quota for this slot." })
+      let skipMsg
+      switch (result?.reason) {
+        case 'daily_limit':
+          skipMsg = `Daily limit reached for this slot (max 30 books/day). Remaining credits carry over — try again tomorrow.`
+          break
+        case 'no_credits':
+          skipMsg = `You're out of book credits. Top up credits on the Upgrade page to submit more.`
+          break
+        default:
+          skipMsg = `Nothing to do — this slot has already submitted everything available right now.`
+      }
+      respond({ success: true, message: skipMsg })
     } else {
       const done  = result?.results?.filter(r => r.status === 'success').length ?? 0
       const total = result?.results?.length ?? '?'

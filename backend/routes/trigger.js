@@ -3,7 +3,6 @@ const router = express.Router()
 const supabase = require('../lib/supabase')
 const { startBot } = require('../bot/bot')
 const { requireAuth, checkRateLimit, isAdminEmail } = require('../lib/auth-middleware')
-const { PLAN_MAX } = require('../bot/bot')
 
 // POST /api/trigger
 // Body: { userId } OR { userIdentifier: email }
@@ -66,11 +65,10 @@ router.post('/', requireAuth, async (req, res) => {
   if (!user.is_active && !isAdmin) return res.status(403).json({ error: 'Account not activated. Please subscribe.' })
   if (!user.ains_cookie_encrypted) return res.status(400).json({ error: 'No AINS session saved. Use "Connect AINS Account" on the dashboard.' })
 
-  // Plan limit enforcement
-  // noob = admin-granted tester role, never expires, unlimited books
+  // Volume is enforced by the bot (credits + daily cap), not the plan tier.
+  // noob = admin-granted tester role, never expires.
   const planExpired = user.plan_expires_at && new Date(user.plan_expires_at) < new Date()
   const activePlan  = (user.plan === 'noob') ? 'noob' : (planExpired ? 'free' : (user.plan || 'free'))
-  const maxAllowed  = isAdmin ? 9999 : (PLAN_MAX[activePlan] ?? 1)
 
   // Rate limit: 5 runs per user per hour (skip for admin and noob testers)
   const skipRateLimit = isAdmin || activePlan === 'noob'
@@ -84,7 +82,7 @@ router.post('/', requireAuth, async (req, res) => {
     if (!Number.isInteger(parsed) || parsed < 1 || parsed > 200) {
       return res.status(400).json({ error: 'count must be an integer between 1 and 200' })
     }
-    countNum = Math.min(parsed, maxAllowed)
+    countNum = parsed
   }
 
   // Wait up to 3 minutes for bot to complete. If it takes longer, respond mid-flight.
@@ -104,9 +102,20 @@ router.post('/', requireAuth, async (req, res) => {
     if (result?.success === false && result?.reason === 'session_expired') {
       respond({ success: false, error: 'AINS session expired. Please reconnect using "Connect AINS Account" on the dashboard.' })
     } else if (result?.skipped) {
-      const skipMsg = activePlan === 'free'
-        ? `Already submitted your 1 book this week. Your quota resets every Monday!`
-        : `Already submitted this month's quota. Nothing to do!`
+      let skipMsg
+      switch (result?.reason) {
+        case 'daily_limit':
+          skipMsg = `Daily limit reached (max 30 books/day). Your remaining credits will carry over — try again tomorrow.`
+          break
+        case 'no_credits':
+          skipMsg = `You're out of book credits. Top up credits on the Upgrade page to submit more.`
+          break
+        case 'free_weekly_used':
+          skipMsg = `Already submitted your 1 free book this week. Your free quota resets every Monday — or top up credits to submit more now.`
+          break
+        default:
+          skipMsg = `Nothing to do — you've already submitted everything available right now.`
+      }
       respond({ success: true, message: skipMsg })
     } else {
       const done = result?.results?.filter(r => r.status === 'success').length ?? 0

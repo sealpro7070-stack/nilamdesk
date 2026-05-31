@@ -10,9 +10,14 @@ const { decrypt } = require('../lib/crypto')
 const { runBot } = require('./browser')
 const { isAdminEmail } = require('../lib/auth-middleware')
 
-// Plan limits — single source of truth
-// noob = tester role granted by admin, effectively unlimited
+// Plan limits — kept for labelling/feature reference only.
+// Volume is now driven by CREDITS, not the plan tier (a user who buys credits
+// must be able to spend them). noob = admin-granted tester role.
 const PLAN_MAX = { free: 1, tester: 10, plus: 30, family: 50, noob: 999 }
+
+// Anti-detection safety cap: no single AINS account may submit more than this
+// many books in one calendar day (MYT). Leftover credits roll to the next day.
+const DAILY_MAX = 30
 
 // Per-user/slot lock: prevents simultaneous bot runs for the same user
 const activeBotRuns = new Map()
@@ -76,6 +81,15 @@ function getWeekStart() {
   return new Date(mondayMYT.getTime() - MYT_OFFSET_MS)
 }
 
+// Returns 00:00:00 MYT (UTC+8) of the current day, expressed as UTC.
+// Used for the per-day submission safety cap.
+function getDayStart() {
+  const MYT_OFFSET_MS = 8 * 60 * 60 * 1000
+  const nowMYT = new Date(Date.now() + MYT_OFFSET_MS)
+  nowMYT.setUTCHours(0, 0, 0, 0)
+  return new Date(nowMYT.getTime() - MYT_OFFSET_MS)
+}
+
 const { randomInt } = require('crypto')
 
 // Fisher-Yates shuffle — unbiased, using cryptographically secure randomness
@@ -113,7 +127,6 @@ async function _startBot(userId, directCookie, directSsUser, directSsProfile, di
   const planExpired = user.plan_expires_at && new Date(user.plan_expires_at) < new Date()
   // noob plan never expires (admin-granted tester role)
   const activePlan  = (user.plan === 'noob') ? 'noob' : (planExpired ? 'free' : (user.plan || 'free'))
-  const maxAllowed  = isAdminUser ? 9999 : (PLAN_MAX[activePlan] ?? 1)
 
   // 2. Fetch settings
   const { data: settings } = await supabase
@@ -130,7 +143,7 @@ async function _startBot(userId, directCookie, directSsUser, directSsProfile, di
     schedule_day: 15
   }
 
-  console.log(`[bot] Settings: ${userSettings.books_per_month} books/month, language=${userSettings.language}, plan=${activePlan} (max=${maxAllowed})`)
+  console.log(`[bot] Settings: ${userSettings.books_per_month} books/month, language=${userSettings.language}, plan=${activePlan}`)
 
   // 3. Decrypt and parse AINS session data
   let ssToken = null, ssUser = null, ssProfile = null, cookiesToInject = []
@@ -164,9 +177,9 @@ async function _startBot(userId, directCookie, directSsUser, directSsProfile, di
     console.warn('[bot] ssToken is null — attempting cookie-only session injection')
   }
 
-  // 4. Check submissions for the current period
-  // Free plan  → 1 book per WEEK  (Monday 00:00 – Sunday 23:59 MYT)
-  // Plus/Family → up to 50 books per MONTH (per PLAN_MAX above)
+  // 4. Check existing submissions (used to skip duplicate books, NOT to cap volume)
+  // Free plan → 1 free book per WEEK (Monday 00:00 MYT); paid users spend credits.
+  // Volume is governed by credits + the DAILY_MAX safety cap below.
 
   // Clean up stale pending records (older than 5 min) — prevents phantom quota blocks
   // from bot runs that crashed before they could mark submissions as failed/success
@@ -182,7 +195,6 @@ async function _startBot(userId, directCookie, directSsUser, directSsProfile, di
   const month = now.getMonth() + 1
   const year  = now.getFullYear()
   const isFree = activePlan === 'free'
-  const periodLabel = isFree ? 'this week' : 'this month'
 
   let existingQuery = supabase
     .from('submissions')
@@ -203,43 +215,50 @@ async function _startBot(userId, directCookie, directSsUser, directSsProfile, di
   const alreadySubmitted = existing || []
   const alreadyBookIds   = alreadySubmitted.map(s => s.book_id)
 
-  // ── Credit balance ────────────────────────────────────────
-  // Free users: 1 book/week is credit-free; additional books consume 1 credit each
-  // Paid users: all books consume 1 credit each (plan just sets the monthly cap)
+  // ── Limits: CREDITS are the source of truth ───────────────
+  // Free users get 1 credit-free book per week; everyone else spends 1 credit
+  // per successful book. The plan tier no longer caps volume — buying credits
+  // is what lets a user submit more.
   const creditBalance  = isAdminUser ? Infinity : (user.credits || 0)
   const freeRemaining  = isFree ? Math.max(0, 1 - alreadySubmitted.length) : 0
-  // Total books allowed this period including free slot + credit allowance
-  const totalAllowed   = isFree ? (freeRemaining + creditBalance) : maxAllowed
+  const creditCeiling  = isAdminUser ? Infinity : (isFree ? freeRemaining + creditBalance : creditBalance)
 
-  // 5. Determine how many books to submit — enforce plan limit in the bot itself
+  // Anti-detection daily cap: count today's submissions (success + pending) for
+  // this user and allow at most DAILY_MAX per calendar day (MYT).
+  let dailyRemaining = Infinity
+  if (!isAdminUser) {
+    const { data: todayRows } = await supabase
+      .from('submissions')
+      .select('id')
+      .eq('user_id', userId)
+      .is('family_slot_id', null)
+      .in('status', ['success', 'pending'])
+      .gte('created_at', getDayStart().toISOString())
+    dailyRemaining = Math.max(0, DAILY_MAX - (todayRows?.length || 0))
+  }
+
+  const ceiling = Math.min(creditCeiling, dailyRemaining)
+
+  // 5. Determine how many books to submit
   let needed
   if (overrideCount && overrideCount > 0) {
-    needed = Math.min(overrideCount, totalAllowed - alreadySubmitted.length)
-    console.log(`[bot] Manual override: requested ${overrideCount}, allowed ${needed} (${alreadySubmitted.length}/${totalAllowed} already done ${periodLabel})`)
+    needed = Math.min(overrideCount, ceiling)
   } else {
-    // Quota mode: free uses weekly max (free slot + credits), paid uses books_per_month capped at plan max
-    const periodTarget = isFree
-      ? Math.min(userSettings.books_per_month || 4, totalAllowed)
-      : Math.min(userSettings.books_per_month, maxAllowed)
-    needed = periodTarget - alreadySubmitted.length
-    if (needed <= 0) {
-      console.log(`[bot] Already submitted ${alreadySubmitted.length}/${periodTarget} books ${periodLabel}. Nothing to do.`)
-      return { success: true, skipped: true, reason: 'already_complete' }
-    }
-    console.log(`[bot] Need ${needed} more book(s) to reach ${isFree ? 'weekly' : 'monthly'} quota (${alreadySubmitted.length}/${periodTarget} done)`)
+    needed = Math.min(userSettings.books_per_month || 4, ceiling)
   }
+  console.log(`[bot] plan=${activePlan} credits=${creditBalance} freeSlot=${freeRemaining} dailyLeft=${dailyRemaining} → submitting ${needed}`)
 
   if (needed <= 0) {
-    console.log(`[bot] ${isFree ? 'Weekly' : 'Monthly'} quota already met. Nothing to do.`)
-    return { success: true, skipped: true, reason: 'already_complete' }
-  }
-
-  // For paid plans: require credits
-  if (!isFree && !isAdminUser) {
-    if (creditBalance <= 0) {
-      throw new Error('No credits remaining. Top up credits to continue submitting.')
+    if (dailyRemaining <= 0) {
+      console.log('[bot] Daily limit reached. Nothing to do.')
+      return { success: true, skipped: true, reason: 'daily_limit' }
     }
-    needed = Math.min(needed, creditBalance)
+    if (creditCeiling <= 0) {
+      console.log('[bot] No credits remaining. Nothing to do.')
+      return { success: true, skipped: true, reason: isFree ? 'free_weekly_used' : 'no_credits' }
+    }
+    console.log('[bot] Nothing to do.')
+    return { success: true, skipped: true, reason: 'already_complete' }
   }
 
   // 6. Pick books: matching language, excluding already submitted this month
@@ -394,9 +413,29 @@ async function _startBotForSlot(userId, slotId, slot) {
     .in('status', ['success'])
 
   const alreadyBookIds = (existing || []).map(s => s.book_id)
-  const slotMax  = PLAN_MAX.family  // 50 books/month per slot
-  const needed   = Math.min(slot.books_per_month || 4, slotMax) - alreadyBookIds.length
-  if (needed <= 0) return { success: true, skipped: true, reason: 'already_complete' }
+
+  // Credits (shared at the parent-user level) are the volume authority.
+  const creditCeiling = isAdminUser ? Infinity : creditBalance
+
+  // Daily safety cap per slot — each slot is its own AINS account.
+  let dailyRemaining = Infinity
+  if (!isAdminUser) {
+    const { data: todayRows } = await supabase
+      .from('submissions')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('family_slot_id', slotId)
+      .in('status', ['success', 'pending'])
+      .gte('created_at', getDayStart().toISOString())
+    dailyRemaining = Math.max(0, DAILY_MAX - (todayRows?.length || 0))
+  }
+
+  const needed = Math.min(slot.books_per_month || 4, creditCeiling, dailyRemaining)
+  if (needed <= 0) {
+    if (dailyRemaining <= 0) return { success: true, skipped: true, reason: 'daily_limit' }
+    if (creditCeiling <= 0) return { success: true, skipped: true, reason: 'no_credits' }
+    return { success: true, skipped: true, reason: 'already_complete' }
+  }
 
   let booksQuery = supabase.from('books').select('*').eq('language', slot.language || 'Melayu')
   if (alreadyBookIds.length > 0) {
@@ -418,11 +457,6 @@ async function _startBotForSlot(userId, slotId, slot) {
 
   if (insertErr) throw new Error(`Failed to create slot submission records: ${insertErr.message}`)
   if (!insertedSubs) throw new Error('Failed to create slot submission records: no data returned')
-
-  // Credit check: require credits for family slot books
-  if (!isAdminUser && creditBalance <= 0) {
-    throw new Error('No credits remaining. Top up credits to continue submitting.')
-  }
 
   // Run bot under global browser semaphore
   let releaseBrowser
