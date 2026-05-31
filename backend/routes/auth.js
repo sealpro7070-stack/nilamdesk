@@ -251,7 +251,7 @@ router.post('/register', requireAuth, async (req, res) => {
     // (plan, credits, is_active) — doing so previously deactivated paid users
     // on every sign-in. Insert defaults only for brand-new users; never update
     // an existing row's plan/credits/activation here.
-    const insertPayload = { id, email, is_active: true, credits: 8 }
+    const insertPayload = { id, email, is_active: true, credits: 7 }
     if (delima_id) insertPayload.delima_id = delima_id
     if (refCode) insertPayload.referred_by = refCode
 
